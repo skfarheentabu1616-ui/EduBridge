@@ -47,6 +47,14 @@ const verifyAIMLAAccess = async (mentorId, studentId) => {
     };
   }
 
+  // If student is assigned to another mentor, prevent unauthorized access
+  if (student.mentor && !student.mentor.equals(mentor._id)) {
+    return {
+      valid: false,
+      message: "Student is assigned to another mentor. You can only manage attendance for your assigned students.",
+    };
+  }
+
   return {
     valid: true,
     mentor,

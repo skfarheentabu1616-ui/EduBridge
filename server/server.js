@@ -11,6 +11,7 @@ const marksRoutes = require("./routes/marks");
 const parentRoutes = require("./routes/parentRoutes");
 const pdfUploadRoutes = require("./routes/pdfUploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const mentorRoutes = require("./routes/mentorRoutes");
 const holidayRoutes = require("./routes/holidayRoutes");
 const observationRoutes = require("./routes/observationRoutes");
 const timetableRoutes = require("./routes/timetableRoutes");
@@ -48,6 +49,8 @@ app.use("/api/parent", parentRoutes);
 app.use("/api/pdf", pdfUploadRoutes);
 
 app.use("/api/admin", adminRoutes);
+
+app.use("/api/mentor", mentorRoutes);
 
 // Holiday
 app.use(

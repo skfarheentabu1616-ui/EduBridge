@@ -235,11 +235,33 @@ function MentorDashboard({ user: propUser, onLogout }) {
 
   const loadStudents = async (currentUser = user) => {
     try {
+      const mentorId =
+        currentUser?._id ||
+        currentUser?.id ||
+        currentUser?.userId ||
+        currentUser?.mentorId;
+
       let records = [];
-      const response = await fetch(`${API}/auth/students`);
-      const data = await response.json();
-      if (response.ok && Array.isArray(data)) {
-        records = data;
+
+      if (mentorId) {
+        const response = await fetch(`${API}/mentor/${mentorId}/students`, {
+          headers: getHeaders(),
+        });
+        const data = await response.json();
+        if (response.ok && Array.isArray(data)) {
+          records = data;
+        }
+      }
+
+      // If no mentorId was found, fallback
+      if (records.length === 0 && !mentorId) {
+        const response = await fetch(`${API}/auth/students`, {
+          headers: getHeaders(),
+        });
+        const data = await response.json();
+        if (response.ok && Array.isArray(data)) {
+          records = data;
+        }
       }
 
       setStudents(records);
@@ -1419,11 +1441,11 @@ function MentorDashboard({ user: propUser, onLogout }) {
         {/* STUDENTS */}
         <Section
           icon="👨‍🎓"
-          title={`${user?.section || "Section"} Students`}
-          subtitle="Your assigned students and their attendance average"
+          title={`Assigned Students (${students.length})`}
+          subtitle="Your assigned students and their attendance performance"
         >
           {students.length === 0 ? (
-            <Empty text="No students found." icon="👨‍🎓" />
+            <Empty text="No students currently assigned to your mentorship. Contact administrator to assign students." icon="👨‍🎓" />
           ) : (
             <div style={styles.studentGrid}>
               {students.map((student) => {

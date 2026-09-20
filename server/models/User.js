@@ -48,6 +48,16 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+
+    // ==========================================
+    // MENTOR ASSIGNMENT (FOR STUDENTS)
+    // ==========================================
+
+    mentor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,

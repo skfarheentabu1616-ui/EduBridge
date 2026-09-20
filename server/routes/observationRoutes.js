@@ -53,6 +53,12 @@ router.post("/", async (req, res) => {
       });
     }
 
+    if (studentUser.mentor && !studentUser.mentor.equals(mentorUser._id)) {
+      return res.status(403).json({
+        message: "Student is assigned to another mentor. You can only create observations for your assigned students.",
+      });
+    }
+
     const observationTitle =
       (title && title.trim()) ||
       (category && category !== "GENERAL"

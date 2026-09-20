@@ -201,20 +201,26 @@ router.post("/login", async (req, res) => {
 });
 
 // ==========================================
-// GET ALL STUDENTS
+// GET ALL STUDENTS (OR FILTER BY MENTOR)
 // GET /api/auth/students
 // ==========================================
 
 router.get("/students", async (req, res) => {
   try {
+    const filter = { role: "STUDENT" };
+
+    if (req.query.mentorId) {
+      filter.mentor = req.query.mentorId;
+    }
+
     const students = await User.find(
-      {
-        role: "STUDENT",
-      },
-      "name email branch section"
-    ).sort({
-      name: 1,
-    });
+      filter,
+      "name email branch section mentor createdAt"
+    )
+      .populate("mentor", "name email branch section")
+      .sort({
+        name: 1,
+      });
 
     res.json(students);
   } catch (error) {
@@ -222,6 +228,35 @@ router.get("/students", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to get students",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// GET STUDENTS FOR SPECIFIC MENTOR
+// GET /api/auth/students/mentor/:mentorId
+// ==========================================
+
+router.get("/students/mentor/:mentorId", async (req, res) => {
+  try {
+    const students = await User.find(
+      {
+        role: "STUDENT",
+        mentor: req.params.mentorId,
+      },
+      "name email branch section mentor createdAt"
+    )
+      .populate("mentor", "name email branch section")
+      .sort({
+        name: 1,
+      });
+
+    res.json(students);
+  } catch (error) {
+    console.error("Get mentor students error:", error);
+    res.status(500).json({
+      message: "Failed to get mentor students",
       error: error.message,
     });
   }

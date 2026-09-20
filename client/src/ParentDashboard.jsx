@@ -856,40 +856,46 @@ function ParentDashboard({ user: propUser, onLogout }) {
         )}
 
         {/* ================================================= */}
-        {/* TAB 7: OBSERVATIONS */}
+        {/* TAB 7: MENTOR UPDATES & OBSERVATIONS */}
         {/* ================================================= */}
         {(activeTab === "ALL" || activeTab === "OBSERVATIONS") && (
           <section style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <div>
-                <h2 style={styles.sectionTitle}>👀 Mentor Observations & Notes</h2>
-                <p style={styles.sectionSubtitle}>Direct behavioral and academic feedback from mentor</p>
+                <h2 style={styles.sectionTitle}>👀 Mentor Updates & Academic Observations</h2>
+                <p style={styles.sectionSubtitle}>Direct behavioral and academic performance remarks from assigned faculty mentor</p>
               </div>
-              <span style={styles.headerCount}>{observations.length} Notes</span>
+              <span style={styles.headerCount}>{observations.length} Updates</span>
             </div>
 
             {observations.length === 0 ? (
               <div style={styles.emptyBox}>
                 <div style={styles.emptyIcon}>📖</div>
-                <div style={styles.emptyTitle}>No Observations Recorded Yet</div>
-                <div style={styles.emptyDesc}>Feedback shared by the mentor will appear here.</div>
+                <div style={styles.emptyTitle}>No Mentor Remarks Recorded Yet</div>
+                <div style={styles.emptyDesc}>Performance feedback and academic remarks shared by the mentor will appear here.</div>
               </div>
             ) : (
               <div style={styles.recordGrid}>
-                {observations.map((obs) => (
-                  <div key={obs._id} style={{ ...styles.itemCard, borderLeft: "4px solid #8b5cf6" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={styles.examTag}>🏷️ {obs.observationType || "GENERAL"}</span>
-                      <span style={styles.dateLabel}>🗓️ {formatDate(obs.date)}</span>
+                {observations.map((obs) => {
+                  const title = obs.title || obs.category || obs.observationType || "Academic Remark";
+                  const text = obs.description || obs.observationText || obs.note || "";
+                  const mentorName = obs.mentor?.name || "Assigned Mentor";
+
+                  return (
+                    <div key={obs._id} style={{ ...styles.itemCard, borderLeft: "4px solid #8b5cf6" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={styles.examTag}>🏷️ {title}</span>
+                        <span style={styles.dateLabel}>🗓️ {formatDate(obs.date || obs.createdAt)}</span>
+                      </div>
+                      <div style={{ marginTop: "10px", fontSize: "14px", color: "#1e293b", lineHeight: 1.5 }}>
+                        "{text}"
+                      </div>
+                      <div style={styles.mentorFooter}>
+                        👨‍🏫 Recorded by: <strong>{mentorName}</strong> {obs.mentor?.email ? `(${obs.mentor.email})` : ""}
+                      </div>
                     </div>
-                    <div style={{ marginTop: "10px", fontSize: "14px", color: "#1e293b", fontStyle: "italic" }}>
-                      "{obs.observationText || obs.note}"
-                    </div>
-                    <div style={styles.mentorFooter}>
-                      👨‍🏫 Recorded by: {obs.mentor?.name || "Mentor"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
