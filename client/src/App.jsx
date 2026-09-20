@@ -88,10 +88,33 @@ function App() {
     }
   });
 
+  const [authMode, setAuthMode] = useState("LOGIN"); // "LOGIN" | "REGISTER"
   const [selectedRole, setSelectedRole] = useState("STUDENT");
+
+  // Login form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Student registration state
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [regBranch, setRegBranch] = useState("CSE");
+  const [regSection, setRegSection] = useState("CSE-A");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+
+  // Parent registration state
+  const [regParentName, setRegParentName] = useState("");
+  const [regParentEmail, setRegParentEmail] = useState("");
+  const [regParentPassword, setRegParentPassword] = useState("");
+  const [regParentConfirmPassword, setRegParentConfirmPassword] = useState("");
+  const [regStudentRef, setRegStudentRef] = useState("");
+  const [showRegParentPassword, setShowRegParentPassword] = useState(false);
+  const [showRegParentConfirmPassword, setShowRegParentConfirmPassword] = useState(false);
+
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -108,11 +131,21 @@ function App() {
     setMessage("");
   };
 
+  const handleModeChange = (mode) => {
+    setAuthMode(mode);
+    setMessage("");
+  };
+
   const handleFillDemo = () => {
+    setAuthMode("LOGIN");
     setEmail(activeRoleData.demoEmail);
     setPassword(activeRoleData.demoPass);
     setMessage("");
   };
+
+  // ==========================================
+  // SIGN IN HANDLER
+  // ==========================================
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
@@ -152,7 +185,7 @@ function App() {
       try {
         data = JSON.parse(resText);
       } catch {
-        // Non-JSON response (e.g. gateway 404/502/503 HTML)
+        // Non-JSON response
       }
 
       if (!response.ok) {
@@ -217,6 +250,193 @@ function App() {
   };
 
   // ==========================================
+  // STUDENT REGISTRATION HANDLER
+  // ==========================================
+
+  const handleStudentRegister = async (e) => {
+    if (e) e.preventDefault();
+    setMessage("");
+
+    if (
+      !regName.trim() ||
+      !regEmail.trim() ||
+      !regPassword ||
+      !regConfirmPassword ||
+      !regBranch ||
+      !regSection
+    ) {
+      setMessage("Please fill in all student registration fields ❌");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(regEmail.trim())) {
+      setMessage("Please enter a valid email address ❌");
+      return;
+    }
+
+    if (regPassword.length < 6) {
+      setMessage("Password must be at least 6 characters long ❌");
+      return;
+    }
+
+    if (regPassword !== regConfirmPassword) {
+      setMessage("Passwords do not match. Please verify and try again ❌");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const cleanEmail = regEmail.trim().toLowerCase();
+
+      let response;
+      try {
+        response = await fetch(`${API}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: regName.trim(),
+            email: cleanEmail,
+            password: regPassword,
+            role: "STUDENT",
+            branch: regBranch.trim().toUpperCase(),
+            section: regSection.trim().toUpperCase(),
+          }),
+        });
+      } catch (networkErr) {
+        console.error("NETWORK ERROR:", networkErr);
+        throw new Error(
+          "Unable to reach the backend server. Please verify your connection."
+        );
+      }
+
+      const resText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        // Non-JSON response
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Registration failed with status code ${response.status}`
+        );
+      }
+
+      if (!data || !data.user) {
+        throw new Error("Registration succeeded but profile data was missing.");
+      }
+
+      const tokenVal = data.token || "user-token";
+      localStorage.setItem("token", tokenVal);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setToken(tokenVal);
+      setUser(data.user);
+      setMessage(`Student account created successfully! Welcome ${data.user.name}! 🎉`);
+    } catch (error) {
+      console.error("STUDENT REGISTRATION ERROR:", error);
+      setMessage(`${error.message || "Registration failed. Please try again."} ❌`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // PARENT REGISTRATION HANDLER
+  // ==========================================
+
+  const handleParentRegister = async (e) => {
+    if (e) e.preventDefault();
+    setMessage("");
+
+    if (
+      !regParentName.trim() ||
+      !regParentEmail.trim() ||
+      !regParentPassword ||
+      !regParentConfirmPassword ||
+      !regStudentRef.trim()
+    ) {
+      setMessage("Please fill in all parent registration fields ❌");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(regParentEmail.trim())) {
+      setMessage("Please enter a valid parent email address ❌");
+      return;
+    }
+
+    if (regParentPassword.length < 6) {
+      setMessage("Password must be at least 6 characters long ❌");
+      return;
+    }
+
+    if (regParentPassword !== regParentConfirmPassword) {
+      setMessage("Passwords do not match. Please verify and try again ❌");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const cleanEmail = regParentEmail.trim().toLowerCase();
+      const cleanStudentRef = regStudentRef.trim();
+
+      let response;
+      try {
+        response = await fetch(`${API}/parent/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: regParentName.trim(),
+            email: cleanEmail,
+            password: regParentPassword,
+            studentEmail: cleanStudentRef,
+            studentId: cleanStudentRef,
+          }),
+        });
+      } catch (networkErr) {
+        console.error("NETWORK ERROR:", networkErr);
+        throw new Error(
+          "Unable to reach the backend server. Please verify your connection."
+        );
+      }
+
+      const resText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        // Non-JSON response
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Registration failed with status code ${response.status}`
+        );
+      }
+
+      if (!data || !data.user) {
+        throw new Error("Registration succeeded but parent profile data was missing.");
+      }
+
+      const tokenVal = data.token || "parent-token";
+      localStorage.setItem("token", tokenVal);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setToken(tokenVal);
+      setUser(data.user);
+      setMessage(`Parent account created successfully! Welcome ${data.user.name}! 🎉`);
+    } catch (error) {
+      console.error("PARENT REGISTRATION ERROR:", error);
+      setMessage(`${error.message || "Registration failed. Please try again."} ❌`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
   // ROLE-BASED ROUTING TO DASHBOARDS
   // ==========================================
 
@@ -241,7 +461,7 @@ function App() {
   }
 
   // ==========================================
-  // PROFESSIONAL COLLEGE EXPO LOGIN UI
+  // PROFESSIONAL COLLEGE EXPO AUTH UI
   // ==========================================
 
   return (
@@ -448,32 +668,33 @@ function App() {
         </div>
 
         {/* =====================================================
-            LOGIN FORM CARD
+            AUTH CARD (SIGN IN / REGISTER)
            ===================================================== */}
         <div
           style={{
             background: "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(20px)",
             borderRadius: "24px",
-            padding: "32px 28px",
+            padding: "30px 26px",
             boxShadow:
               "0 25px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2)",
             position: "relative",
           }}
         >
-          {/* Form Header */}
+          {/* Card Header with Sign In / Register Nav */}
           <div
             style={{
               display: "flex",
-              alignItems: "flex-start",
+              alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: "22px",
+              marginBottom: "20px",
               paddingBottom: "16px",
               borderBottom: "1px solid #f1f5f9",
               gap: "12px",
               flexWrap: "wrap",
             }}
           >
+            {/* Title & Subtitle */}
             <div>
               <div
                 style={{
@@ -493,101 +714,136 @@ function App() {
                     letterSpacing: "-0.3px",
                   }}
                 >
-                  {activeRoleData.loginTitle}
+                  {authMode === "LOGIN"
+                    ? activeRoleData.loginTitle
+                    : selectedRole === "STUDENT"
+                    ? "Student Registration"
+                    : selectedRole === "PARENT"
+                    ? "Parent Registration"
+                    : `${activeRoleData.title} Access`}
                 </h2>
               </div>
               <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>
-                {activeRoleData.loginSubtitle}
+                {authMode === "LOGIN"
+                  ? activeRoleData.loginSubtitle
+                  : selectedRole === "STUDENT"
+                  ? "Create your student profile with branch and section details"
+                  : selectedRole === "PARENT"
+                  ? "Register with your details and your student's email"
+                  : "Administrative account management"}
               </p>
             </div>
 
-            {/* Quick Demo Fill Button for Expo */}
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              title={`Auto-fill ${activeRoleData.title} demo account`}
+            {/* Mode Switcher Pills (Sign In / Create Account) */}
+            <div
               style={{
                 display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "6px 12px",
-                borderRadius: "10px",
-                border: `1px solid ${activeRoleData.borderColor}`,
-                background: activeRoleData.bgLight,
-                color: activeRoleData.color,
-                fontSize: "12px",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
+                background: "#f1f5f9",
+                padding: "3px",
+                borderRadius: "12px",
+                gap: "2px",
               }}
             >
-              <span>⚡</span> Demo Credentials
-            </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange("LOGIN")}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: authMode === "LOGIN" ? "#ffffff" : "transparent",
+                  color: authMode === "LOGIN" ? "#0f172a" : "#64748b",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  boxShadow:
+                    authMode === "LOGIN" ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                🔑 Sign In
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleModeChange("REGISTER")}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: authMode === "REGISTER" ? "#ffffff" : "transparent",
+                  color: authMode === "REGISTER" ? activeRoleData.color : "#64748b",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  boxShadow:
+                    authMode === "REGISTER"
+                      ? "0 2px 6px rgba(0,0,0,0.08)"
+                      : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                ✨ Create Account
+              </button>
+            </div>
           </div>
 
-          {/* Form */}
-          <form
-            onSubmit={handleLogin}
-            style={{ display: "flex", flexDirection: "column", gap: "18px" }}
-          >
-            {/* Email Field */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  color: "#334155",
-                  marginBottom: "6px",
-                }}
-              >
-                Email Address
-              </label>
-              <input
-                type="email"
-                placeholder={activeRoleData.emailPlaceholder}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "13px 15px",
-                  borderRadius: "12px",
-                  border: "1.5px solid #cbd5e1",
-                  fontSize: "14px",
-                  outline: "none",
-                  color: "#0f172a",
-                  background: "#ffffff",
-                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-                }}
-              />
-            </div>
+          {/* =====================================================
+              CASE 1: SIGN IN MODE (All Roles)
+             ===================================================== */}
+          {authMode === "LOGIN" && (
+            <form
+              onSubmit={handleLogin}
+              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+            >
+              {/* Quick Demo Fill Button */}
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={handleFillDemo}
+                  title={`Auto-fill ${activeRoleData.title} demo account`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    padding: "6px 12px",
+                    borderRadius: "10px",
+                    border: `1px solid ${activeRoleData.borderColor}`,
+                    background: activeRoleData.bgLight,
+                    color: activeRoleData.color,
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <span>⚡</span> Demo Credentials
+                </button>
+              </div>
 
-            {/* Password Field with Show/Hide Toggle */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  color: "#334155",
-                  marginBottom: "6px",
-                }}
-              >
-                Password
-              </label>
-              <div style={{ position: "relative", width: "100%" }}>
+              {/* Email Field */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Email Address
+                </label>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  type="email"
+                  placeholder={activeRoleData.emailPlaceholder}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   style={{
                     width: "100%",
                     boxSizing: "border-box",
-                    padding: "13px 45px 13px 15px",
+                    padding: "12px 14px",
                     borderRadius: "12px",
                     border: "1.5px solid #cbd5e1",
                     fontSize: "14px",
@@ -597,81 +853,854 @@ function App() {
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
                 />
+              </div>
+
+              {/* Password Field with Show/Hide Toggle */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Password
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px 45px 12px 14px",
+                      borderRadius: "12px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                      transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback / Status Alert */}
+              {message && (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    background: message.includes("🎉") ? "#dcfce7" : "#fee2e2",
+                    color: message.includes("🎉") ? "#15803d" : "#b91c1c",
+                    border: `1px solid ${
+                      message.includes("🎉") ? "#86efac" : "#fca5a5"
+                    }`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span>{message.includes("🎉") ? "✅" : "⚠️"}</span>
+                  <span>{message}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  marginTop: "4px",
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "none",
+                  background: loading
+                    ? "#94a3b8"
+                    : `linear-gradient(135deg, ${activeRoleData.color} 0%, #7c3aed 100%)`,
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: "800",
+                  letterSpacing: "0.2px",
+                  cursor: loading ? "wait" : "pointer",
+                  boxShadow: loading
+                    ? "none"
+                    : `0 10px 25px ${activeRoleData.color}50`,
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {loading ? "Signing in... ⏳" : `Sign In as ${activeRoleData.title} 🚀`}
+              </button>
+
+              {/* Helper link to switch to Register */}
+              {(selectedRole === "STUDENT" || selectedRole === "PARENT") && (
+                <div style={{ textAlign: "center", marginTop: "4px" }}>
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange("REGISTER")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: activeRoleData.color,
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Don't have an account? Create {activeRoleData.title} Account ✨
+                  </button>
+                </div>
+              )}
+            </form>
+          )}
+
+          {/* =====================================================
+              CASE 2: STUDENT REGISTRATION FORM
+             ===================================================== */}
+          {authMode === "REGISTER" && selectedRole === "STUDENT" && (
+            <form
+              onSubmit={handleStudentRegister}
+              style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+            >
+              {/* Full Name */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Farheen Tabu"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. farheen@student.com"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Branch & Section Row */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      color: "#334155",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    Branch / Dept
+                  </label>
+                  <select
+                    value={regBranch}
+                    onChange={(e) => {
+                      const newBranch = e.target.value;
+                      setRegBranch(newBranch);
+                      setRegSection(`${newBranch}-A`);
+                    }}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="CSE">CSE (Computer Science)</option>
+                    <option value="AIML">AIML (AI & Machine Learning)</option>
+                    <option value="ECE">ECE (Electronics & Comm)</option>
+                    <option value="MECH">MECH (Mechanical)</option>
+                    <option value="IT">IT (Information Tech)</option>
+                    <option value="CIVIL">CIVIL (Civil Engineering)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      color: "#334155",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    Section
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. CSE-A"
+                    value={regSection}
+                    onChange={(e) => setRegSection(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Password (min 6 characters)
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegPassword ? "text" : "password"}
+                    placeholder="Create password"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    title={showRegPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Confirm Password
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                    title={showRegConfirmPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegConfirmPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Alert */}
+              {message && (
+                <div
+                  style={{
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    background: message.includes("🎉") ? "#dcfce7" : "#fee2e2",
+                    color: message.includes("🎉") ? "#15803d" : "#b91c1c",
+                    border: `1px solid ${
+                      message.includes("🎉") ? "#86efac" : "#fca5a5"
+                    }`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span>{message.includes("🎉") ? "✅" : "⚠️"}</span>
+                  <span>{message}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  marginTop: "6px",
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "none",
+                  background: loading
+                    ? "#94a3b8"
+                    : `linear-gradient(135deg, ${activeRoleData.color} 0%, #7c3aed 100%)`,
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: "800",
+                  cursor: loading ? "wait" : "pointer",
+                  boxShadow: `0 10px 25px ${activeRoleData.color}50`,
+                }}
+              >
+                {loading ? "Creating Account... ⏳" : "Create Student Account 🎓"}
+              </button>
+
+              {/* Switch to Sign In link */}
+              <div style={{ textAlign: "center", marginTop: "2px" }}>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  title={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => handleModeChange("LOGIN")}
                   style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
                     background: "none",
                     border: "none",
+                    color: "#4f46e5",
+                    fontSize: "13px",
+                    fontWeight: "700",
                     cursor: "pointer",
-                    fontSize: "16px",
-                    padding: "4px",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Already have an account? Sign In 🔑
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* =====================================================
+              CASE 3: PARENT REGISTRATION FORM
+             ===================================================== */}
+          {authMode === "REGISTER" && selectedRole === "PARENT" && (
+            <form
+              onSubmit={handleParentRegister}
+              style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+            >
+              {/* Parent Full Name */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Parent / Guardian Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ramesh Sharma"
+                  value={regParentName}
+                  onChange={(e) => setRegParentName(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Parent Email */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Parent Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. parent@example.com"
+                  value={regParentEmail}
+                  onChange={(e) => setRegParentEmail(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Linked Student Reference */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Student's Registered Email or Student ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. rahul@student.com"
+                  value={regStudentRef}
+                  onChange={(e) => setRegStudentRef(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+                <small
+                  style={{
+                    display: "block",
                     color: "#64748b",
+                    fontSize: "11px",
+                    marginTop: "4px",
+                  }}
+                >
+                  ℹ️ Enter the registered college email of your ward to link accounts securely.
+                </small>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Password (min 6 characters)
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegParentPassword ? "text" : "password"}
+                    placeholder="Create password"
+                    value={regParentPassword}
+                    onChange={(e) => setRegParentPassword(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRegParentPassword(!showRegParentPassword)
+                    }
+                    title={showRegParentPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegParentPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Confirm Password
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegParentConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={regParentConfirmPassword}
+                    onChange={(e) =>
+                      setRegParentConfirmPassword(e.target.value)
+                    }
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRegParentConfirmPassword(
+                        !showRegParentConfirmPassword
+                      )
+                    }
+                    title={
+                      showRegParentConfirmPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegParentConfirmPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Alert */}
+              {message && (
+                <div
+                  style={{
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    background: message.includes("🎉") ? "#dcfce7" : "#fee2e2",
+                    color: message.includes("🎉") ? "#15803d" : "#b91c1c",
+                    border: `1px solid ${
+                      message.includes("🎉") ? "#86efac" : "#fca5a5"
+                    }`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span>{message.includes("🎉") ? "✅" : "⚠️"}</span>
+                  <span>{message}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  marginTop: "6px",
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "none",
+                  background: loading
+                    ? "#94a3b8"
+                    : `linear-gradient(135deg, ${activeRoleData.color} 0%, #db2777 100%)`,
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: "800",
+                  cursor: loading ? "wait" : "pointer",
+                  boxShadow: `0 10px 25px ${activeRoleData.color}50`,
+                }}
+              >
+                {loading ? "Creating Parent Account... ⏳" : "Create Parent Account 👪"}
+              </button>
+
+              {/* Switch to Sign In link */}
+              <div style={{ textAlign: "center", marginTop: "2px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange("LOGIN")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#db2777",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Already have an account? Sign In 🔑
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* =====================================================
+              CASE 4: MENTOR OR ADMIN REGISTRATION RESTRICTION NOTICE
+             ===================================================== */}
+          {authMode === "REGISTER" &&
+            (selectedRole === "MENTOR" || selectedRole === "ADMIN") && (
+              <div
+                style={{
+                  padding: "24px 20px",
+                  borderRadius: "16px",
+                  background: activeRoleData.bgLight,
+                  border: `1.5px solid ${activeRoleData.borderColor}`,
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "14px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "54px",
+                    height: "54px",
+                    borderRadius: "50%",
+                    background: "#ffffff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    lineHeight: 1,
+                    fontSize: "26px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
                   }}
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  {activeRoleData.icon}
+                </div>
+
+                <div>
+                  <h3
+                    style={{
+                      margin: "0 0 6px",
+                      fontSize: "17px",
+                      fontWeight: "800",
+                      color: "#0f172a",
+                    }}
+                  >
+                    {selectedRole === "MENTOR"
+                      ? "Mentor Registration Restricted"
+                      : "Admin Registration Restricted"}
+                  </h3>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "13px",
+                      color: "#475569",
+                      lineHeight: "1.5",
+                      maxWidth: "460px",
+                    }}
+                  >
+                    {selectedRole === "MENTOR"
+                      ? "Mentor accounts are created by the administrator. Faculty mentors should contact their department administrator for authorized credentials."
+                      : "Admin accounts are created securely by the system administrator. Public registration is disabled for administrative security."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleModeChange("LOGIN")}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: activeRoleData.color,
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    boxShadow: `0 4px 12px ${activeRoleData.color}40`,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  👉 Switch to {activeRoleData.title} Sign In
                 </button>
               </div>
-            </div>
-
-            {/* Feedback / Status Alert */}
-            {message && (
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  background: message.includes("🎉") ? "#dcfce7" : "#fee2e2",
-                  color: message.includes("🎉") ? "#15803d" : "#b91c1c",
-                  border: `1px solid ${
-                    message.includes("🎉") ? "#86efac" : "#fca5a5"
-                  }`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                <span>{message.includes("🎉") ? "✅" : "⚠️"}</span>
-                <span>{message}</span>
-              </div>
             )}
-
-            {/* Submit Button with Loading State */}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                marginTop: "4px",
-                padding: "15px",
-                borderRadius: "14px",
-                border: "none",
-                background: loading
-                  ? "#94a3b8"
-                  : `linear-gradient(135deg, ${activeRoleData.color} 0%, #7c3aed 100%)`,
-                color: "#ffffff",
-                fontSize: "15px",
-                fontWeight: "800",
-                letterSpacing: "0.2px",
-                cursor: loading ? "wait" : "pointer",
-                boxShadow: loading
-                  ? "none"
-                  : `0 10px 25px ${activeRoleData.color}50`,
-                transition: "all 0.15s ease",
-              }}
-            >
-              {loading ? "Signing in... ⏳" : "Sign In to EduBridge 🚀"}
-            </button>
-          </form>
         </div>
 
         {/* =====================================================

@@ -3,11 +3,12 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Parent = require("../models/Parent");
 
 const router = express.Router();
 
 // ==========================================
-// REGISTER
+// REGISTER (Student Public Registration)
 // POST /api/auth/register
 // ==========================================
 
@@ -22,19 +23,56 @@ router.post("/register", async (req, res) => {
       section,
     } = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password || !branch || !section) {
       return res.status(400).json({
-        message: "Please provide all details",
+        message: "Please provide all required fields: name, email, password, branch, and section",
       });
     }
 
+    // Role check: Only STUDENT role allowed for public registration
+    const targetRole = String(role || "STUDENT").toUpperCase();
+    if (targetRole !== "STUDENT") {
+      return res.status(403).json({
+        message: "Public registration is only permitted for Student accounts. Mentor and Admin accounts are created by administrators.",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({
+        message: "Please provide a valid email address",
+      });
+    }
+
+    // Password length validation
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    // Check duplicate in User collection
     const existingUser = await User.findOne({
-      email,
+      email: cleanEmail,
     });
 
     if (existingUser) {
       return res.status(400).json({
-        message: "User already exists",
+        message: "An account with this email address already exists",
+      });
+    }
+
+    // Check duplicate in Parent collection
+    const existingParent = await Parent.findOne({
+      email: cleanEmail,
+    });
+
+    if (existingParent) {
+      return res.status(400).json({
+        message: "This email address is already registered as a Parent account",
       });
     }
 
@@ -44,17 +82,30 @@ router.post("/register", async (req, res) => {
     );
 
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: cleanEmail,
       password: hashedPassword,
-      role,
-      branch: branch || "",
-      section: section || "",
+      role: "STUDENT",
+      branch: branch.trim().toUpperCase(),
+      section: section.trim().toUpperCase(),
     });
 
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET || "edubridge_secret_2026",
+      {
+        expiresIn: "1d",
+      }
+    );
+
     res.status(201).json({
-      message: "User registered successfully",
+      message: "Student account registered successfully",
+      token,
       user: {
+        _id: user._id,
         id: user._id,
         name: user.name,
         email: user.email,
@@ -64,7 +115,7 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Student registration error:", error);
 
     res.status(500).json({
       message: "Registration failed",
