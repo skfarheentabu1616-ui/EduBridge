@@ -23,17 +23,22 @@ router.post("/register", async (req, res) => {
       section,
     } = req.body;
 
-    if (!name || !email || !password || !branch || !section) {
-      return res.status(400).json({
-        message: "Please provide all required fields: name, email, password, branch, and section",
+    const targetRole = String(role || "STUDENT").toUpperCase();
+    if (targetRole === "ADMIN") {
+      return res.status(403).json({
+        message: "Admin accounts are created securely by the system administrator. Public registration is not permitted.",
       });
     }
 
-    // Role check: Only STUDENT role allowed for public registration
-    const targetRole = String(role || "STUDENT").toUpperCase();
-    if (targetRole !== "STUDENT") {
-      return res.status(403).json({
-        message: "Public registration is only permitted for Student accounts. Mentor and Admin accounts are created by administrators.",
+    if (!["STUDENT", "MENTOR"].includes(targetRole)) {
+      return res.status(400).json({
+        message: "Invalid role specified for registration. Allowed roles: STUDENT, MENTOR",
+      });
+    }
+
+    if (!name || !email || !password || !branch || !section) {
+      return res.status(400).json({
+        message: "Please provide all required fields: name, email, password, branch, and section",
       });
     }
 
@@ -85,9 +90,10 @@ router.post("/register", async (req, res) => {
       name: name.trim(),
       email: cleanEmail,
       password: hashedPassword,
-      role: "STUDENT",
+      role: targetRole,
       branch: branch.trim().toUpperCase(),
       section: section.trim().toUpperCase(),
+      mentor: null,
     });
 
     const token = jwt.sign(
@@ -101,8 +107,10 @@ router.post("/register", async (req, res) => {
       }
     );
 
+    const roleLabel = targetRole === "MENTOR" ? "Mentor" : "Student";
+
     res.status(201).json({
-      message: "Student account registered successfully",
+      message: `${roleLabel} account registered successfully`,
       token,
       user: {
         _id: user._id,
@@ -112,10 +120,11 @@ router.post("/register", async (req, res) => {
         role: user.role,
         branch: user.branch,
         section: user.section,
+        mentor: user.mentor,
       },
     });
   } catch (error) {
-    console.error("Student registration error:", error);
+    console.error("Account registration error:", error);
 
     res.status(500).json({
       message: "Registration failed",

@@ -8,19 +8,45 @@ const Observation = require("../models/Observation");
 
 const router = express.Router();
 
+const jwt = require("jsonwebtoken");
+
+// Helper to extract mentor ID from params, query, or Bearer JWT token
+const extractMentorId = (req) => {
+  if (req.params.mentorId && mongoose.Types.ObjectId.isValid(req.params.mentorId)) {
+    return req.params.mentorId;
+  }
+  if (req.query.mentorId && mongoose.Types.ObjectId.isValid(req.query.mentorId)) {
+    return req.query.mentorId;
+  }
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "edubridge_secret_2026");
+      if (decoded && (decoded.id || decoded._id)) {
+        return decoded.id || decoded._id;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+};
+
 // =====================================================
 // GET ASSIGNED STUDENTS FOR A SPECIFIC MENTOR
+// GET /api/mentor/students
 // GET /api/mentor/:mentorId/students
 // GET /api/mentor/students/:mentorId
 // =====================================================
 
 const getAssignedStudentsHandler = async (req, res) => {
   try {
-    const mentorId = req.params.mentorId || req.query.mentorId;
+    const mentorId = extractMentorId(req);
 
     if (!mentorId || !mongoose.Types.ObjectId.isValid(mentorId)) {
       return res.status(400).json({
-        message: "A valid Mentor ID is required",
+        message: "A valid authenticated Mentor ID is required",
       });
     }
 
@@ -35,7 +61,7 @@ const getAssignedStudentsHandler = async (req, res) => {
       });
     }
 
-    // Query students assigned specifically to this mentor
+    // Query all students assigned specifically to this mentor (NO limits)
     const assignedStudents = await User.find(
       {
         role: "STUDENT",
@@ -56,32 +82,9 @@ const getAssignedStudentsHandler = async (req, res) => {
   }
 };
 
+router.get("/students", getAssignedStudentsHandler);
 router.get("/:mentorId/students", getAssignedStudentsHandler);
 router.get("/students/:mentorId", getAssignedStudentsHandler);
-
-// Optional fallback route if mentorId is passed as query param: GET /api/mentor/students?mentorId=...
-router.get("/students", async (req, res) => {
-  if (req.query.mentorId) {
-    return getAssignedStudentsHandler(req, res);
-  }
-
-  try {
-    const students = await User.find(
-      { role: "STUDENT" },
-      "name email role branch section mentor createdAt"
-    )
-      .populate("mentor", "name email branch section")
-      .sort({ name: 1 });
-
-    res.json(students);
-  } catch (error) {
-    console.error("Get all mentor students error:", error);
-    res.status(500).json({
-      message: "Failed to load students",
-      error: error.message,
-    });
-  }
-});
 
 // =====================================================
 // GET MENTOR SUMMARY & STATS

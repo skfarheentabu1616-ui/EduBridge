@@ -26,6 +26,14 @@ function Login({ onLoginSuccess }) {
   const [regParentConfirmPassword, setRegParentConfirmPassword] = useState("");
   const [regStudentRef, setRegStudentRef] = useState("");
 
+  // Mentor registration state
+  const [regMentorName, setRegMentorName] = useState("");
+  const [regMentorEmail, setRegMentorEmail] = useState("");
+  const [regMentorPassword, setRegMentorPassword] = useState("");
+  const [regMentorConfirmPassword, setRegMentorConfirmPassword] = useState("");
+  const [regMentorBranch, setRegMentorBranch] = useState("CSE");
+  const [regMentorSection, setRegMentorSection] = useState("CSE-A");
+
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -219,6 +227,61 @@ function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleMentorRegisterSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setMessage("");
+
+    if (!regMentorName.trim() || !regMentorEmail.trim() || !regMentorPassword || !regMentorConfirmPassword || !regMentorBranch || !regMentorSection) {
+      setMessage("Please fill all mentor registration fields ❌");
+      return;
+    }
+
+    if (regMentorPassword.length < 6) {
+      setMessage("Password must be at least 6 characters ❌");
+      return;
+    }
+
+    if (regMentorPassword !== regMentorConfirmPassword) {
+      setMessage("Passwords do not match ❌");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: regMentorName.trim(),
+          email: regMentorEmail.trim().toLowerCase(),
+          password: regMentorPassword,
+          role: "MENTOR",
+          branch: regMentorBranch.trim().toUpperCase(),
+          section: regMentorSection.trim().toUpperCase(),
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || `Registration failed (HTTP ${response.status})`);
+      }
+
+      const tokenVal = data.token || "mentor-token";
+      localStorage.setItem("token", tokenVal);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setMessage(`Mentor account created! Welcome ${data.user.name}! 🎉`);
+
+      if (typeof onLoginSuccess === "function") {
+        onLoginSuccess(data.user, tokenVal);
+      }
+    } catch (error) {
+      console.error("MENTOR REGISTRATION ERROR:", error);
+      setMessage(`${error.message || "Registration failed"} ❌`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="login-page">
       <div className="login-box">
@@ -377,13 +440,57 @@ function Login({ onLoginSuccess }) {
           </form>
         )}
 
-        {/* Mode: REGISTER - MENTOR / ADMIN RESTRICTED */}
-        {mode === "REGISTER" && (role === "MENTOR" || role === "ADMIN") && (
+        {/* Mode: REGISTER - MENTOR */}
+        {mode === "REGISTER" && role === "MENTOR" && (
+          <form onSubmit={handleMentorRegisterSubmit}>
+            <input
+              type="text"
+              placeholder="Faculty / Mentor Full Name"
+              value={regMentorName}
+              onChange={(e) => setRegMentorName(e.target.value)}
+            />
+            <input
+              type="email"
+              placeholder="Official Email Address"
+              value={regMentorEmail}
+              onChange={(e) => setRegMentorEmail(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Department / Branch (e.g. CSE)"
+              value={regMentorBranch}
+              onChange={(e) => setRegMentorBranch(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Section (e.g. CSE-A)"
+              value={regMentorSection}
+              onChange={(e) => setRegMentorSection(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Password (min 6 chars)"
+              value={regMentorPassword}
+              onChange={(e) => setRegMentorPassword(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={regMentorConfirmPassword}
+              onChange={(e) => setRegMentorConfirmPassword(e.target.value)}
+            />
+
+            <button type="submit" disabled={loading}>
+              {loading ? "Creating..." : "Register Mentor"}
+            </button>
+          </form>
+        )}
+
+        {/* Mode: REGISTER - ADMIN RESTRICTED */}
+        {mode === "REGISTER" && role === "ADMIN" && (
           <div style={{ padding: "16px", background: "#f8fafc", borderRadius: "8px", textAlign: "center" }}>
             <p style={{ fontSize: "14px", color: "#475569", margin: "0 0 12px" }}>
-              {role === "MENTOR"
-                ? "Mentor accounts are created by the administrator."
-                : "Admin accounts are created securely by the system administrator."}
+              Admin accounts are created securely by the system administrator.
             </p>
             <button
               type="button"

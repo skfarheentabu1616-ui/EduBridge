@@ -115,6 +115,16 @@ function App() {
   const [showRegParentPassword, setShowRegParentPassword] = useState(false);
   const [showRegParentConfirmPassword, setShowRegParentConfirmPassword] = useState(false);
 
+  // Mentor registration state
+  const [regMentorName, setRegMentorName] = useState("");
+  const [regMentorEmail, setRegMentorEmail] = useState("");
+  const [regMentorPassword, setRegMentorPassword] = useState("");
+  const [regMentorConfirmPassword, setRegMentorConfirmPassword] = useState("");
+  const [regMentorBranch, setRegMentorBranch] = useState("AIML");
+  const [regMentorSection, setRegMentorSection] = useState("AIML-A");
+  const [showRegMentorPassword, setShowRegMentorPassword] = useState(false);
+  const [showRegMentorConfirmPassword, setShowRegMentorConfirmPassword] = useState(false);
+
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -437,6 +447,100 @@ function App() {
   };
 
   // ==========================================
+  // MENTOR REGISTRATION HANDLER
+  // ==========================================
+
+  const handleMentorRegister = async (e) => {
+    if (e) e.preventDefault();
+    setMessage("");
+
+    if (
+      !regMentorName.trim() ||
+      !regMentorEmail.trim() ||
+      !regMentorPassword ||
+      !regMentorConfirmPassword ||
+      !regMentorBranch ||
+      !regMentorSection
+    ) {
+      setMessage("Please fill in all mentor registration fields ❌");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(regMentorEmail.trim())) {
+      setMessage("Please enter a valid email address ❌");
+      return;
+    }
+
+    if (regMentorPassword.length < 6) {
+      setMessage("Password must be at least 6 characters long ❌");
+      return;
+    }
+
+    if (regMentorPassword !== regMentorConfirmPassword) {
+      setMessage("Passwords do not match. Please verify and try again ❌");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const cleanEmail = regMentorEmail.trim().toLowerCase();
+
+      let response;
+      try {
+        response = await fetch(`${API}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: regMentorName.trim(),
+            email: cleanEmail,
+            password: regMentorPassword,
+            role: "MENTOR",
+            branch: regMentorBranch.trim().toUpperCase(),
+            section: regMentorSection.trim().toUpperCase(),
+          }),
+        });
+      } catch (networkErr) {
+        console.error("NETWORK ERROR:", networkErr);
+        throw new Error(
+          "Unable to reach the backend server. Please verify your connection."
+        );
+      }
+
+      const resText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        // Non-JSON response
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Registration failed with status code ${response.status}`
+        );
+      }
+
+      if (!data || !data.user) {
+        throw new Error("Registration succeeded but mentor profile data was missing.");
+      }
+
+      const tokenVal = data.token || "user-token";
+      localStorage.setItem("token", tokenVal);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setToken(tokenVal);
+      setUser(data.user);
+      setMessage(`Mentor account created successfully! Welcome ${data.user.name}! 🎉`);
+    } catch (error) {
+      console.error("MENTOR REGISTRATION ERROR:", error);
+      setMessage(`${error.message || "Registration failed. Please try again."} ❌`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
   // ROLE-BASED ROUTING TO DASHBOARDS
   // ==========================================
 
@@ -720,6 +824,8 @@ function App() {
                     ? "Student Registration"
                     : selectedRole === "PARENT"
                     ? "Parent Registration"
+                    : selectedRole === "MENTOR"
+                    ? "Mentor Registration"
                     : `${activeRoleData.title} Access`}
                 </h2>
               </div>
@@ -730,6 +836,8 @@ function App() {
                   ? "Create your student profile with branch and section details"
                   : selectedRole === "PARENT"
                   ? "Register with your details and your student's email"
+                  : selectedRole === "MENTOR"
+                  ? "Create your faculty mentor profile with department details"
                   : "Administrative account management"}
               </p>
             </div>
@@ -964,7 +1072,7 @@ function App() {
               </button>
 
               {/* Helper link to switch to Register */}
-              {(selectedRole === "STUDENT" || selectedRole === "PARENT") && (
+              {(selectedRole === "STUDENT" || selectedRole === "PARENT" || selectedRole === "MENTOR") && (
                 <div style={{ textAlign: "center", marginTop: "4px" }}>
                   <button
                     type="button"
@@ -1620,87 +1728,424 @@ function App() {
           )}
 
           {/* =====================================================
-              CASE 4: MENTOR OR ADMIN REGISTRATION RESTRICTION NOTICE
+              CASE 4: MENTOR REGISTRATION FORM
              ===================================================== */}
-          {authMode === "REGISTER" &&
-            (selectedRole === "MENTOR" || selectedRole === "ADMIN") && (
-              <div
-                style={{
-                  padding: "24px 20px",
-                  borderRadius: "16px",
-                  background: activeRoleData.bgLight,
-                  border: `1.5px solid ${activeRoleData.borderColor}`,
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "14px",
-                }}
-              >
-                <div
+          {authMode === "REGISTER" && selectedRole === "MENTOR" && (
+            <form
+              onSubmit={handleMentorRegister}
+              style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+            >
+              {/* Mentor Full Name */}
+              <div>
+                <label
                   style={{
-                    width: "54px",
-                    height: "54px",
-                    borderRadius: "50%",
-                    background: "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "26px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
                   }}
                 >
-                  {activeRoleData.icon}
+                  Faculty Mentor Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dr. Anita Rao"
+                  value={regMentorName}
+                  onChange={(e) => setRegMentorName(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Mentor Email */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Official Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. anita@mentor.com"
+                  value={regMentorEmail}
+                  onChange={(e) => setRegMentorEmail(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                  }}
+                />
+              </div>
+
+              {/* Branch & Section Row */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      color: "#334155",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    Branch / Dept
+                  </label>
+                  <select
+                    value={regMentorBranch}
+                    onChange={(e) => {
+                      const newBranch = e.target.value;
+                      setRegMentorBranch(newBranch);
+                      setRegMentorSection(`${newBranch}-A`);
+                    }}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="AIML">AIML (AI & Machine Learning)</option>
+                    <option value="CSE">CSE (Computer Science)</option>
+                    <option value="ECE">ECE (Electronics & Comm)</option>
+                    <option value="MECH">MECH (Mechanical)</option>
+                    <option value="IT">IT (Information Tech)</option>
+                    <option value="CIVIL">CIVIL (Civil Engineering)</option>
+                  </select>
                 </div>
 
                 <div>
-                  <h3
+                  <label
                     style={{
-                      margin: "0 0 6px",
-                      fontSize: "17px",
-                      fontWeight: "800",
-                      color: "#0f172a",
-                    }}
-                  >
-                    {selectedRole === "MENTOR"
-                      ? "Mentor Registration Restricted"
-                      : "Admin Registration Restricted"}
-                  </h3>
-                  <p
-                    style={{
-                      margin: 0,
+                      display: "block",
                       fontSize: "13px",
-                      color: "#475569",
-                      lineHeight: "1.5",
-                      maxWidth: "460px",
+                      fontWeight: "700",
+                      color: "#334155",
+                      marginBottom: "5px",
                     }}
                   >
-                    {selectedRole === "MENTOR"
-                      ? "Mentor accounts are created by the administrator. Faculty mentors should contact their department administrator for authorized credentials."
-                      : "Admin accounts are created securely by the system administrator. Public registration is disabled for administrative security."}
-                  </p>
+                    Section
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. AIML-A"
+                    value={regMentorSection}
+                    onChange={(e) => setRegMentorSection(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
                 </div>
+              </div>
 
+              {/* Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Password (min 6 characters)
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegMentorPassword ? "text" : "password"}
+                    placeholder="Create password"
+                    value={regMentorPassword}
+                    onChange={(e) => setRegMentorPassword(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRegMentorPassword(!showRegMentorPassword)
+                    }
+                    title={showRegMentorPassword ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegMentorPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    color: "#334155",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Confirm Password
+                </label>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <input
+                    type={showRegMentorConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={regMentorConfirmPassword}
+                    onChange={(e) =>
+                      setRegMentorConfirmPassword(e.target.value)
+                    }
+                    required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 45px 11px 13px",
+                      borderRadius: "11px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "14px",
+                      outline: "none",
+                      color: "#0f172a",
+                      background: "#ffffff",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRegMentorConfirmPassword(
+                        !showRegMentorConfirmPassword
+                      )
+                    }
+                    title={
+                      showRegMentorConfirmPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      padding: "4px",
+                      color: "#64748b",
+                    }}
+                  >
+                    {showRegMentorConfirmPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Alert */}
+              {message && (
+                <div
+                  style={{
+                    padding: "11px 13px",
+                    borderRadius: "11px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    background: message.includes("🎉") ? "#dcfce7" : "#fee2e2",
+                    color: message.includes("🎉") ? "#15803d" : "#b91c1c",
+                    border: `1px solid ${
+                      message.includes("🎉") ? "#86efac" : "#fca5a5"
+                    }`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span>{message.includes("🎉") ? "✅" : "⚠️"}</span>
+                  <span>{message}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  marginTop: "6px",
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "none",
+                  background: loading
+                    ? "#94a3b8"
+                    : `linear-gradient(135deg, ${activeRoleData.color} 0%, #047857 100%)`,
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: "800",
+                  cursor: loading ? "wait" : "pointer",
+                  boxShadow: `0 10px 25px ${activeRoleData.color}50`,
+                }}
+              >
+                {loading ? "Creating Mentor Account... ⏳" : "Create Mentor Account 👨‍🏫"}
+              </button>
+
+              {/* Switch to Sign In link */}
+              <div style={{ textAlign: "center", marginTop: "2px" }}>
                 <button
                   type="button"
                   onClick={() => handleModeChange("LOGIN")}
                   style={{
-                    padding: "10px 20px",
-                    borderRadius: "10px",
+                    background: "none",
                     border: "none",
-                    background: activeRoleData.color,
-                    color: "#ffffff",
+                    color: "#059669",
                     fontSize: "13px",
                     fontWeight: "700",
                     cursor: "pointer",
-                    boxShadow: `0 4px 12px ${activeRoleData.color}40`,
-                    transition: "all 0.15s ease",
+                    textDecoration: "underline",
                   }}
                 >
-                  👉 Switch to {activeRoleData.title} Sign In
+                  Already have an account? Sign In 🔑
                 </button>
               </div>
-            )}
+            </form>
+          )}
+
+          {/* =====================================================
+              CASE 5: ADMIN REGISTRATION RESTRICTION NOTICE ONLY
+             ===================================================== */}
+          {authMode === "REGISTER" && selectedRole === "ADMIN" && (
+            <div
+              style={{
+                padding: "24px 20px",
+                borderRadius: "16px",
+                background: activeRoleData.bgLight,
+                border: `1.5px solid ${activeRoleData.borderColor}`,
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "14px",
+              }}
+            >
+              <div
+                style={{
+                  width: "54px",
+                  height: "54px",
+                  borderRadius: "50%",
+                  background: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "26px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                }}
+              >
+                {activeRoleData.icon}
+              </div>
+
+              <div>
+                <h3
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: "17px",
+                    fontWeight: "800",
+                    color: "#0f172a",
+                  }}
+                >
+                  Admin Registration Restricted
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "13px",
+                    color: "#475569",
+                    lineHeight: "1.5",
+                    maxWidth: "460px",
+                  }}
+                >
+                  Admin accounts are created securely by the system administrator. Public self-registration is disabled for administrative portal security.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleModeChange("LOGIN")}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: activeRoleData.color,
+                  color: "#ffffff",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  boxShadow: `0 4px 12px ${activeRoleData.color}40`,
+                  transition: "all 0.15s ease",
+                }}
+              >
+                👉 Switch to {activeRoleData.title} Sign In
+              </button>
+            </div>
+          )}
         </div>
 
         {/* =====================================================
