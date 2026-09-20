@@ -128,46 +128,89 @@ function App() {
       setLoading(true);
 
       const cleanEmail = email.trim().toLowerCase();
-      const isParent = selectedRole === "PARENT" || cleanEmail.includes("parent");
 
-      const endpoints = isParent
-        ? [`${API}/parent/login`, `${API}/auth/login`]
-        : [`${API}/auth/login`, `${API}/parent/login`];
+      // Role selection strictly controls the auth endpoint
+      const isParent = selectedRole === "PARENT";
+      const endpoint = isParent ? `${API}/parent/login` : `${API}/auth/login`;
 
-      let lastErrorMessage = "Invalid email or password ❌";
-
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: cleanEmail, password }),
-          });
-
-          const data = await response.json().catch(() => ({}));
-
-          if (response.ok && data.user) {
-            const tokenVal = data.token || (isParent ? "parent-token" : "user-token");
-            localStorage.setItem("token", tokenVal);
-            localStorage.setItem("user", JSON.stringify(data.user));
-            setToken(tokenVal);
-            setUser(data.user);
-            setMessage(`Welcome ${data.user.name}! 🎉`);
-            return;
-          }
-
-          if (data.message) {
-            lastErrorMessage = data.message;
-          }
-        } catch {
-          // try next endpoint fallback
-        }
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password }),
+        });
+      } catch (networkErr) {
+        console.error("NETWORK ERROR:", networkErr);
+        throw new Error(
+          "Unable to connect to the backend server. Please verify your connection or backend URL."
+        );
       }
 
-      setMessage(lastErrorMessage || "Invalid email or password ❌");
+      const resText = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        // Non-JSON response (e.g. gateway 404/502/503 HTML)
+      }
+
+      if (!response.ok) {
+        if (data && data.message) {
+          throw new Error(data.message);
+        }
+        if (response.status === 404) {
+          throw new Error(
+            `API endpoint not found (HTTP 404). Please verify backend URL: ${API}`
+          );
+        }
+        if (
+          response.status === 502 ||
+          response.status === 503 ||
+          response.status === 504
+        ) {
+          throw new Error(
+            `Backend server is waking up or temporarily unavailable (HTTP ${response.status}). Please wait a few seconds and try again.`
+          );
+        }
+        if (response.status === 401) {
+          throw new Error(
+            isParent
+              ? "Invalid parent email or password"
+              : "Invalid email or password"
+          );
+        }
+        throw new Error(
+          `Login failed with HTTP status ${response.status}. Please check your credentials.`
+        );
+      }
+
+      if (!data || !data.user) {
+        throw new Error(
+          "Invalid response from server: user profile data missing."
+        );
+      }
+
+      const returnedRole = String(data.user.role || "").toUpperCase();
+
+      // Verify that the authenticated account matches the selected login role
+      if (selectedRole !== returnedRole) {
+        throw new Error(
+          `This account is registered as ${returnedRole}, but you are logging in on the ${activeRoleData.title} tab. Please switch to the ${returnedRole} tab to sign in.`
+        );
+      }
+
+      const tokenVal =
+        data.token || (returnedRole === "PARENT" ? "parent-token" : "user-token");
+
+      localStorage.setItem("token", tokenVal);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setToken(tokenVal);
+      setUser(data.user);
+      setMessage(`Welcome ${data.user.name}! 🎉`);
     } catch (error) {
       console.error("LOGIN ERROR:", error);
-      setMessage("Server connection failed. Please check if the backend is running. ❌");
+      setMessage(`${error.message || "Login failed. Please try again."} ❌`);
     } finally {
       setLoading(false);
     }
